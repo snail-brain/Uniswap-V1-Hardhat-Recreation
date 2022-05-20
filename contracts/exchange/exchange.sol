@@ -2,7 +2,6 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "hardhat/console.sol";
 
 contract Exchange is ERC20 {
     address public tokenAddress;
@@ -11,6 +10,10 @@ contract Exchange is ERC20 {
         require(_token != address(0), "invalid token address");
         tokenAddress = _token;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            USER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function addLiquidity(uint256 _tokenAmount)
         public
@@ -50,13 +53,36 @@ contract Exchange is ERC20 {
             "you don't have enough lp tokens!"
         );
 
-        (uint256 removedEth, uint256 removedToken) = getLPOutput(_amount);
+        uint256 removedEth = (address(this).balance * _amount) / totalSupply();
+        uint256 removedToken = (getReserves() * _amount) / totalSupply();
+
         _burn(msg.sender, _amount);
         payable(msg.sender).transfer(removedEth);
         IERC20(tokenAddress).transfer(msg.sender, removedToken);
 
         return (removedEth, removedToken);
     }
+
+    function ethToTokenSwap(uint256 _minTokens) public payable {
+        uint256 tokensBought = getTokenAmount(msg.value, true);
+        require(tokensBought >= _minTokens, "Too Much Slippage!");
+        IERC20(tokenAddress).transfer(msg.sender, tokensBought);
+    }
+
+    function tokenToEthSwap(uint256 _tokensTraded, uint256 _minTokens) public {
+        uint256 ethBought = getEthAmount(_tokensTraded);
+        require(ethBought >= _minTokens, "Too Much Slippage!");
+        IERC20(tokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokensTraded
+        );
+        payable(msg.sender).transfer(ethBought);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        HELPER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
 
     function getReserves() public view returns (uint256) {
         return IERC20(tokenAddress).balanceOf(address(this));
@@ -81,23 +107,6 @@ contract Exchange is ERC20 {
         return _getAmount(tokenAmount, getReserves(), address(this).balance);
     }
 
-    function ethToTokenSwap(uint256 _minTokens) public payable {
-        uint256 tokensBought = getTokenAmount(msg.value, true);
-        require(tokensBought >= _minTokens, "Too Much Slippage!");
-        IERC20(tokenAddress).transfer(msg.sender, tokensBought);
-    }
-
-    function tokenToEthSwap(uint256 _tokensTraded, uint256 _minTokens) public {
-        uint256 ethBought = getEthAmount(_tokensTraded);
-        require(ethBought >= _minTokens, "Too Much Slippage!");
-        IERC20(tokenAddress).transferFrom(
-            msg.sender,
-            address(this),
-            _tokensTraded
-        );
-        payable(msg.sender).transfer(ethBought);
-    }
-
     function _getAmount(
         uint256 inputAmount,
         uint256 inputReserve,
@@ -108,16 +117,5 @@ contract Exchange is ERC20 {
         uint256 numerator = outputReserve * inputAmountWithFee;
         uint256 denominator = inputReserve * 100 + inputAmountWithFee;
         return numerator / denominator;
-    }
-
-    function getLPOutput(uint256 _amount)
-        public
-        view
-        returns (uint256, uint256)
-    {
-        uint256 removedEth = (address(this).balance * _amount) / totalSupply();
-        uint256 removedToken = (getReserves() * _amount) / totalSupply();
-
-        return (removedEth, removedToken);
     }
 }
