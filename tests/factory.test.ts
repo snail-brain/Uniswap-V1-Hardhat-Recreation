@@ -6,13 +6,6 @@ import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 
 
-
-const getBalance = ethers.provider.getBalance;
-const toWei = (value: any) =>
-    ethers.utils.parseEther(value.toString());
-const fromWei = (value: any) =>
-    ethers.utils.formatEther(BigNumber.from(value.toString()));
-
 describe("Factory", async () => {
     let owner: SignerWithAddress;
     let user: SignerWithAddress;
@@ -22,7 +15,7 @@ describe("Factory", async () => {
     beforeEach(async () => {
         [owner, user] = await ethers.getSigners();
         factory = await helper.deployContract("Factory");
-        token = await helper.deployContract("Token", "Snail", "SNL", toWei('10000'));
+        token = await helper.deployContract("Token", "Snail", "SNL", helper.toWei('10000'));
 
     });
 

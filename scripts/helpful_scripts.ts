@@ -5,6 +5,12 @@ import * as dotenv from "dotenv";
 dotenv.config();
 const network = "rinkeby"
 
+export const getBalance = ethers.provider.getBalance;
+export const toWei = (value: any) =>
+    ethers.utils.parseEther(value.toString());
+export const fromWei = (value: any) =>
+    ethers.utils.formatEther(BigNumber.from(value.toString()));
+
 export const provider = ethers.getDefaultProvider(network, {
     etherscan: process.env.ETHERSCAN_KEY,
     alchemy: process.env.ALCHEMY_KEY
@@ -34,8 +40,8 @@ export async function spentOnGas(...args: ContractReceipt[]) {
         const x = args[receipt].gasUsed.mul(args[receipt].effectiveGasPrice);
         total = total.add(x);
     }
-
     return total;
 }
+
 
 
