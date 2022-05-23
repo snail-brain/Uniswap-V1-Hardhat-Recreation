@@ -15,6 +15,7 @@ const fromWei = (value: any) =>
 describe("Exchange", () => {
     let owner: SignerWithAddress;
     let user: SignerWithAddress;
+    let factory: Contract;
     let exchange: Contract;
     let token: Contract;
     let exchangeEthBalance: BigNumber;
@@ -29,7 +30,8 @@ describe("Exchange", () => {
     beforeEach(async () => {
         [owner, user] = await ethers.getSigners();
         token = await helper.deployContract("Token", "Snail", "SNL", toWei('10000'));
-        exchange = await helper.deployContract("Exchange", token.address);
+        factory = await helper.deployContract("Factory");
+        exchange = await helper.deployContract("Exchange", token.address, factory.address);
 
         await helper.waitForTx(await token.approve(exchange.address, tokenAmount));
         await helper.waitForTx(await exchange.addLiquidity(tokenAmount, {

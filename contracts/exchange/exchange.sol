@@ -2,13 +2,18 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../factory/factory.sol";
 
 contract Exchange is ERC20 {
     address public tokenAddress;
+    Factory public factory;
 
-    constructor(address _token) ERC20("UNI LP", "UNILP") {
-        require(_token != address(0), "invalid token address");
+    constructor(address _token, address payable _factoryAddress)
+        ERC20("UNI LP", "UNILP")
+    {
+        require(_token != address(0), "Exchange: invalid token address");
         tokenAddress = _token;
+        factory = Factory(_factoryAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -32,7 +37,7 @@ contract Exchange is ERC20 {
 
             require(
                 currentRatio == userRatio,
-                "Liquidity ratio is not equal to current exchange ratio"
+                "Exchange: Liquidity ratio is not equal to current exchange ratio"
             );
 
             token.transferFrom(msg.sender, address(this), _tokenAmount);
@@ -47,10 +52,10 @@ contract Exchange is ERC20 {
         public
         returns (uint256, uint256)
     {
-        require(_amount > 0, "Amount must be > 0!");
+        require(_amount > 0, "Exchange: Amount must be > 0!");
         require(
             balanceOf(msg.sender) >= _amount,
-            "you don't have enough lp tokens!"
+            "Exchange: you don't have enough lp tokens!"
         );
 
         uint256 removedEth = (address(this).balance * _amount) / totalSupply();
@@ -63,29 +68,71 @@ contract Exchange is ERC20 {
         return (removedEth, removedToken);
     }
 
-    function ethToTokenSwap(uint256 _minTokens) public payable {
+    function ethToTokenSwap(uint256 _minTokens)
+        public
+        payable
+        returns (uint256)
+    {
         uint256 tokensBought = _getAmount(
             msg.value,
             address(this).balance - msg.value,
             getReserves()
         );
-        require(tokensBought >= _minTokens, "Too Much Slippage!");
+        require(tokensBought >= _minTokens, "Exchange: Too Much Slippage!");
         IERC20(tokenAddress).transfer(msg.sender, tokensBought);
+
+        return tokensBought;
     }
 
-    function tokenToEthSwap(uint256 _tokensTraded, uint256 _minTokens) public {
+    function tokenToEthSwap(uint256 _tokensTraded, uint256 _minTokens)
+        public
+        returns (uint256)
+    {
         uint256 ethBought = _getAmount(
             _tokensTraded,
             getReserves(),
             address(this).balance
         );
-        require(ethBought >= _minTokens, "Too Much Slippage!");
+        require(ethBought >= _minTokens, "Exchange: Too Much Slippage");
         IERC20(tokenAddress).transferFrom(
             msg.sender,
             address(this),
             _tokensTraded
         );
         payable(msg.sender).transfer(ethBought);
+
+        return ethBought;
+    }
+
+    function tokenToTokenSwap(
+        address _token,
+        uint256 _tokensTraded,
+        uint256 _minTokens
+    ) public returns (uint256) {
+        Exchange _exchange = Exchange(factory.getExchange(_token));
+        require(address(_exchange) != address(0), "Exchange: Invalid Exchange");
+        uint256 ethAmount = _getAmount(
+            _tokensTraded,
+            getReserves(),
+            address(this).balance
+        );
+
+        // transfer tokens from user to this contract
+        IERC20(tokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            _tokensTraded
+        );
+
+        // Send eth to 2nd exchange in return for token
+        uint256 tokensBought = _exchange.ethToTokenSwap{value: ethAmount}(
+            _minTokens
+        );
+
+        // transfer new tokens to user
+        IERC20(_token).transfer(msg.sender, tokensBought);
+
+        return tokensBought;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -101,7 +148,7 @@ contract Exchange is ERC20 {
         view
         returns (uint256)
     {
-        require(ethAmount > 0, "you gotta sell something dawg");
+        require(ethAmount > 0, "Exchange: you gotta sell something dawg");
 
         uint256 ethReserves;
         if (ethSent) {
@@ -111,8 +158,12 @@ contract Exchange is ERC20 {
     }
 
     function getEthAmount(uint256 tokenAmount) public view returns (uint256) {
-        require(tokenAmount > 0, "gotta input more than zero bruv");
+        require(tokenAmount > 0, "Exchange: gotta input more than zero bruv");
         return _getAmount(tokenAmount, getReserves(), address(this).balance);
+    }
+
+    function getFactory() public view returns (address) {
+        return address(factory);
     }
 
     function _getAmount(
@@ -120,7 +171,10 @@ contract Exchange is ERC20 {
         uint256 inputReserve,
         uint256 outputReserve
     ) private pure returns (uint256) {
-        require(inputReserve > 0 && outputReserve > 0, "no liquidity");
+        require(
+            inputReserve > 0 && outputReserve > 0,
+            "Exchange: no liquidity"
+        );
         uint256 inputAmountWithFee = inputAmount * 99;
         uint256 numerator = outputReserve * inputAmountWithFee;
         uint256 denominator = inputReserve * 100 + inputAmountWithFee;
