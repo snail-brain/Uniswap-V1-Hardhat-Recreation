@@ -12,7 +12,7 @@ contract Exchange is ERC20 {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            USER FUNCTIONS
+                            USER ACTIONS
     //////////////////////////////////////////////////////////////*/
 
     function addLiquidity(uint256 _tokenAmount)
@@ -64,13 +64,21 @@ contract Exchange is ERC20 {
     }
 
     function ethToTokenSwap(uint256 _minTokens) public payable {
-        uint256 tokensBought = getTokenAmount(msg.value, true);
+        uint256 tokensBought = _getAmount(
+            msg.value,
+            address(this).balance - msg.value,
+            getReserves()
+        );
         require(tokensBought >= _minTokens, "Too Much Slippage!");
         IERC20(tokenAddress).transfer(msg.sender, tokensBought);
     }
 
     function tokenToEthSwap(uint256 _tokensTraded, uint256 _minTokens) public {
-        uint256 ethBought = getEthAmount(_tokensTraded);
+        uint256 ethBought = _getAmount(
+            _tokensTraded,
+            getReserves(),
+            address(this).balance
+        );
         require(ethBought >= _minTokens, "Too Much Slippage!");
         IERC20(tokenAddress).transferFrom(
             msg.sender,

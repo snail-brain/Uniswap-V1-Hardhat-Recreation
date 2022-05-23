@@ -81,6 +81,13 @@ describe("Exchange", () => {
             expect(await token.balanceOf(owner.address)).to.equal(ownerTokenBalance);
 
         });
+
+        it("Reverts if user does not have enough tokens", async () => {
+            await helper.waitForTx(await token.connect(user).approve(exchange.address, toWei('1')));
+            await expect(exchange.connect(user).addLiquidity(toWei('1'), {
+                value: toWei('0.5')
+            })).to.be.revertedWith("ERC20: transfer amount exceeds balance");
+        });
     });
 
     describe("getTokenAmounts", async () => {
@@ -150,11 +157,16 @@ describe("Exchange", () => {
             const tx2 = await helper.waitForTx(await exchange.removeLiquidity(lpRemoved));
             const spentOnGas = await helper.spentOnGas(tx1, tx2);
 
+            // Owner Eth Balance
             expect(await getBalance(owner.address)).to.equal((ownerEthBalance).add(await expectedOutputs[0]).sub(spentOnGas));
+            // Owner LP Balance
             expect(await exchange.balanceOf(owner.address)).to.equal(lpTokenBalance.sub(lpRemoved));
+            // Owner Token Balance
             expect(await token.balanceOf(owner.address)).to.equal(ownerTokenBalance.add(expectedOutputs[1]));
 
+            // Exchange Eth Balance
             expect(await getBalance(exchange.address)).to.equal(exchangeEthBalance.sub(expectedOutputs[0]));
+            // Exchange Token Balance
             expect(await token.balanceOf(exchange.address)).to.equal(exchangeTokenBalance.sub(expectedOutputs[1]));
         });
     });
