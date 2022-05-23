@@ -110,7 +110,11 @@ contract Exchange is ERC20 {
         uint256 _minTokens
     ) public returns (uint256) {
         Exchange _exchange = Exchange(factory.getExchange(_token));
-        require(address(_exchange) != address(0), "Exchange: Invalid Exchange");
+        require(
+            address(_exchange) != address(this) &&
+                address(_exchange) != address(0),
+            "Exchange: Invalid Exchange"
+        );
         uint256 ethAmount = _getAmount(
             _tokensTraded,
             getReserves(),
